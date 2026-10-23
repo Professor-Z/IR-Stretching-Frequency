@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bond Vibrations</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1120; color: #e5e7eb;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+    /* ---- Slide-down CONTROLS bar (same pattern as E2.html) ---- */
+    #controls-wrap { position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
+        transform: translateY(calc(-100% + 30px)); transition: transform 0.9s cubic-bezier(0.22, 0.61, 0.36, 1); pointer-events: none; }
+    #controls-wrap:hover, #controls-wrap:focus-within, #controls-wrap.open { transform: translateY(0); }
+    #controls-wrap > * { pointer-events: auto; }
+    .glass-panel { background: rgba(17, 24, 39, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(75, 85, 99, 0.7); box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+    #controls-panel { width: 100%; border-width: 0 0 1px 0; padding: 0.75rem 1.25rem 0.6rem; }
+    #controls-tab { height: 30px; background: #22e55e; color: #04290f; font-weight: 800; font-size: 13px; letter-spacing: 0.2em;
+        padding: 6px 28px 0; border-radius: 0 0 12px 12px; box-shadow: 0 0 14px rgba(34,229,94,0.75), 0 0 30px rgba(34,229,94,0.35);
+        cursor: pointer; user-select: none; }
+    .cp-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.7rem 1.6rem; }
+    .cp-group { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .cp-title h1 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #60a5fa; line-height: 1.2; }
+    .cp-title div { font-size: 0.75rem; font-weight: 600; color: #9ca3af; }
+    .eq { display: inline-flex; align-items: center; gap: 0.3rem; font-family: "Times New Roman", Georgia, serif; font-size: 1.05rem; color: #f3f4f6;
+        padding: 0.2rem 0.6rem; border: 1px solid #374151; border-radius: 0.4rem; background: rgba(31,41,55,0.6); }
+    .frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; font-size: 0.85em; }
+    .frac span:first-child { border-bottom: 1px solid #e5e7eb; padding: 0 0.15em; }
+    .sqrt { display: inline-flex; align-items: center; }
+    .sqrt .rad { font-size: 1.5em; line-height: 1; }
+    .sqrt .under { border-top: 1px solid #e5e7eb; padding-left: 0.1em; }
+    .i { font-style: italic; }
+    .nu { position: relative; font-style: italic; }
+    .nu .tl { position: absolute; left: 0.12em; top: -0.55em; font-size: 0.8em; font-style: normal; }
+    .bond-group { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.5rem; border-radius: 0.45rem;
+        border: 1px solid #374151; background: rgba(31,41,55,0.55); }
+    .bond-tag { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; margin-right: 0.15rem; }
+    select { background: #1f2937; color: #f9fafb; border: 1px solid #4b5563; border-radius: 0.35rem; padding: 0.25rem 0.35rem;
+        font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer; }
+    select:focus { border-color: #60a5fa; }
+    select:disabled { opacity: 0.4; cursor: not-allowed; }
+    option:disabled { color: #6b7280; }
+    .cp-btn { padding: 0.4rem 0.7rem; border-radius: 0.375rem; font-size: 0.75rem; line-height: 1rem; font-weight: 700; white-space: nowrap;
+        transition: background-color .15s; box-shadow: 0 1px 3px rgba(0,0,0,.4); color: #fff; border: 0; cursor: pointer; }
+    .btn-blue { background: #2563eb; } .btn-blue:hover { background: #3b82f6; }
+    .btn-gray { background: #374151; } .btn-gray:hover { background: #4b5563; }
+    .btn-morse { background: transparent; border: 1px solid #a855f7; color: #d8b4fe; } .btn-morse:hover, .btn-morse.on { background: #9333ea; color: #fff; }
+    .lbl { font-size: 0.72rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+    input[type=range] { accent-color: #22e55e; width: 110px; }
+    #speed-val { font-size: 0.75rem; font-weight: 700; color: #e5e7eb; min-width: 2.6em; }
+    #focus-bar { position: fixed; z-index: 10; display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; transform: translateX(-50%);
+        width: max-content; max-width: 94vw; opacity: 0; pointer-events: none; transition: opacity .35s; }
+    #focus-bar.show { opacity: 1; pointer-events: auto; }
+    .btn-ir { background: #dc2626; box-shadow: 0 0 12px rgba(239,68,68,0.55); } .btn-ir:hover { background: #ef4444; }
+    .btn-green { background: #16a34a; box-shadow: 0 0 12px rgba(34,197,94,0.5); } .btn-green:hover { background: #22c55e; }
+    .cp-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+    @media (max-width: 719px) { #focus-bar .cp-btn { padding: 0.35rem 0.5rem; font-size: 0.7rem; } }
+    #hint { margin-top: 0.45rem; text-align: center; font-size: 0.75rem; font-weight: 600; color: #4ade80; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div id="focus-bar">
+    <button id="btn-ex1" class="cp-btn btn-ir">EXCITATION to n = 1</button>
+    <button id="btn-ex2" class="cp-btn btn-ir">EXCITATION to n = 2</button>
+    <button id="btn-relax" class="cp-btn btn-green">RELAX to n = 0</button>
+</div>
+
+<div id="controls-wrap">
+    <div id="controls-panel" class="glass-panel">
+        <div class="cp-row">
+            <div class="cp-title">
+                <h1>Bond Vibrations</h1>
+                <div>IR Stretching Frequencies</div>
+            </div>
+            <div class="eq" title="Harmonic oscillator: wavenumber of absorption">
+                <span class="nu">ν<span class="tl">~</span></span> =
+                <span class="frac"><span>1</span><span>2π<span class="i">c</span></span></span>
+                <span class="sqrt"><span class="rad">√</span><span class="under"><span class="frac"><span class="i">k</span><span class="i">μ</span></span></span></span>
+            </div>
+            <div id="bond-groups" class="cp-group"></div>
+            <div class="cp-group">
+                <span class="lbl">Speed</span>
+                <input id="speed" type="range" min="0.1" max="1" step="0.05" value="1">
+                <span id="speed-val">1.0×</span>
+                <button id="btn-pause" class="cp-btn btn-blue">PAUSE</button>
+                <button id="btn-details" class="cp-btn btn-gray">μ &amp; k: OFF</button>
+                <button id="btn-morse" class="cp-btn btn-morse">SHOW MORSE POTENTIAL</button>
+            </div>
+        </div>
+    </div>
+    <div id="controls-tab">CONTROLS</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------------- Data ----------------
+// Average atomic masses (u), covalent radii (pm) and CPK-style colours.
+const EL = {
+    H:  { m: 1.008,   cov: 31,  color: '#eef2f7', ink: '#111827' },
+    C:  { m: 12.011,  cov: 76,  color: '#59616e', ink: '#ffffff' },
+    N:  { m: 14.007,  cov: 71,  color: '#2f6bf0', ink: '#ffffff' },
+    O:  { m: 15.999,  cov: 66,  color: '#e0322f', ink: '#ffffff' },
+    F:  { m: 18.998,  cov: 57,  color: '#9ad63a', ink: '#0f1a05' },
+    Cl: { m: 35.45,   cov: 102, color: '#2cc84f', ink: '#04210c' },
+    Br: { m: 79.904,  cov: 120, color: '#a3302b', ink: '#ffffff' },
+    I:  { m: 126.904, cov: 139, color: '#8b2fc9', ink: '#ffffff' }
+};
+const ATOMS = ['H', 'C', 'N', 'O', 'F', 'Cl', 'Br', 'I'];
+const HALOGENS = ['F', 'Cl', 'Br', 'I'];
+
+// Stretching force constants k (N/m) and bond lengths (pm) for each pair and bond order.
+// k values are fitted so that the 0→1 transition of the Morse oscillator (the IR absorption)
+// matches typical observed stretching bands. The big ν̃ on each card is the harmonic value from
+// the equation, which is slightly higher than the absorption because real bonds are anharmonic.
+const BOND_DATA = { 'H|H|1':[580,74], 'H|N|1':[690,101], 'H|O|1':[795,96], 'H|F|1':[965,92], 'H|Cl|1':[525,127], 'H|Br|1':[420,141], 'H|I|1':[320,161], 'C|C|1':[365,154], 'C|C|2':[995,134], 'C|C|3':[1685,120], 'C|N|1':[530,147], 'C|N|2':[1085,128], 'C|N|3':[1990,116], 'C|O|1':[510,143], 'C|O|2':[1220,121], 'C|O|3':[1900,113], 'C|F|1':[590,135], 'C|Cl|1':[305,177], 'C|Br|1':[225,194], 'C|I|1':[165,214], 'N|N|1':[490,145], 'N|N|2':[1080,125], 'N|N|3':[2310,110], 'N|O|1':[420,140], 'N|O|2':[1090,121], 'N|O|3':[2390,106], 'O|O|1':[395,148], 'O|O|2':[1185,121], 'N|F|1':[400,137], 'N|Cl|1':[300,175], 'N|Br|1':[260,190], 'N|I|1':[195,210], 'O|F|1':[370,142], 'O|Cl|1':[330,170], 'O|Br|1':[310,185], 'O|I|1':[270,200], 'F|F|1':[480,142], 'Cl|Cl|1':[335,199], 'Br|Br|1':[250,228], 'I|I|1':[175,267], 'F|Cl|1':[465,163], 'F|Br|1':[420,176], 'F|I|1':[370,191], 'Cl|Br|1':[290,214], 'Cl|I|1':[245,232], 'Br|I|1':[210,247] };
+
+// C–H by carbon hybridization: more s character -> shorter, stiffer, stronger bond.
+Object.assign(BOND_DATA, { 'H|C|1|sp3': [520, 109], 'H|C|1|sp2': [565, 108], 'H|C|1|sp': [640, 106] });
+const HYBS = [
+    { key: 'sp3', sup: 'sp³', name: 'sp³ (alkane)' },
+    { key: 'sp2', sup: 'sp²', name: 'sp² (alkene)' },
+    { key: 'sp',  sup: 'sp',  name: 'sp (alkyne)' }
+];
+// Approximate bond dissociation energies D0 (kJ/mol): typical/average values used to set the depth of each Morse well.
+const BDE = { 'H|H|1':436, 'H|C|1|sp3':423, 'H|C|1|sp2':464, 'H|C|1|sp':558, 'H|N|1':391, 'H|O|1':463, 'H|F|1':567, 'H|Cl|1':431, 'H|Br|1':366, 'H|I|1':299,
+    'C|C|1':348, 'C|C|2':614, 'C|C|3':839, 'C|N|1':293, 'C|N|2':615, 'C|N|3':891, 'C|O|1':358, 'C|O|2':745, 'C|O|3':1072,
+    'C|F|1':485, 'C|Cl|1':328, 'C|Br|1':276, 'C|I|1':240, 'N|N|1':163, 'N|N|2':418, 'N|N|3':941, 'N|O|1':201, 'N|O|2':607, 'N|O|3':1051,
+    'O|O|1':146, 'O|O|2':495, 'N|F|1':272, 'N|Cl|1':200, 'N|Br|1':243, 'N|I|1':159, 'O|F|1':190, 'O|Cl|1':203, 'O|Br|1':234, 'O|I|1':234,
+    'F|F|1':155, 'Cl|Cl|1':242, 'Br|Br|1':193, 'I|I|1':151, 'F|Cl|1':253, 'F|Br|1':237, 'F|I|1':278, 'Cl|Br|1':218, 'Cl|I|1':211, 'Br|I|1':179 };
+const CM_TO_KJ = 0.0119627;        // 1 cm^-1 = 0.0119627 kJ/mol
+const N_A = 6.02214076e23;
+const AMU = 1.66053907e-27;        // kg
+const C_CM = 2.99792458e10;        // speed of light, cm/s
+const BASE_RATE = 800;             // on-screen vibration: 1 Hz per 800 cm^-1 at speed 1x
+const SLOT_COLORS = ['#38bdf8', '#fbbf24', '#f472b6'];
+const ORDER_SYM = { 1: '–', 2: '=', 3: '≡' };
+const ORDER_NAME = { 1: 'single', 2: 'double', 3: 'triple' };
+
+function maxOrder(a, b) {
+    if (a === 'NONE' || b === 'NONE') return 0;
+    if (a === 'H' || b === 'H' || HALOGENS.includes(a) || HALOGENS.includes(b)) return 1;
+    if (a === 'O' && b === 'O') return 2;   // no O≡O
+    return 3;
+}
+const isCH = (a, b) => (a === 'C' && b === 'H') || (a === 'H' && b === 'C');
+function bondInfo(a, b, order, hyb) {
+    const [x, y] = [a, b].sort((p, q) => ATOMS.indexOf(p) - ATOMS.indexOf(q));
+    const ch = isCH(a, b);
+    const key = `${x}|${y}|${order}` + (ch ? `|${hyb || 'sp3'}` : '');
+    const d = BOND_DATA[key];
+    const mA = EL[a].m, mB = EL[b].m;
+    const mu = mA * mB / (mA + mB);                                   // u
+    const k = d[0];                                                   // N/m
+    const nu = Math.sqrt(k / (mu * AMU)) / (2 * Math.PI * C_CM);      // cm^-1  (the attached equation)
+    const info = { a, b, order, hyb: ch ? (hyb || 'sp3') : null, mu, k, nu, r: d[1], D0: BDE[key] };
+    info.morse = morseParams(info);
+    return info;
+}
+// Morse potential V(r) = De(1 - e^{-a(r - re)})^2 - De (zero = separated atoms), with the same k at the minimum.
+function morseParams(info) {
+    const De = info.D0 + 0.5 * info.nu * CM_TO_KJ;                    // well depth = D0 + zero-point energy (kJ/mol)
+    const a = Math.sqrt(info.k / (2 * De * 1000 / N_A)) * 1e-12;      // pm^-1
+    const we = info.nu, wexe = we * we / (4 * De / CM_TO_KJ);         // cm^-1
+    const G = [0, 1, 2].map(v => (we * (v + 0.5) - wexe * (v + 0.5) ** 2) * CM_TO_KJ);   // kJ/mol above the minimum
+    const re = info.r;
+    const V = r => De * (1 - Math.exp(-a * (r - re))) ** 2 - De;
+    const turn = E => { const s = Math.sqrt(E / De); return [re - Math.log(1 + s) / a, re - Math.log(1 - s) / a]; };
+    return { De, a, we, wexe, G, V, turn, fund: (G[1] - G[0]) / CM_TO_KJ, over: (G[2] - G[0]) / CM_TO_KJ,
+        freqAt: E => we * Math.sqrt(Math.max(0, 1 - E / De)) };   // classical Morse frequency at energy E above the minimum
+}
+// Zero-point-style relative amplitude ∝ (μk)^-1/4, normalised to C–O and exaggerated for visibility.
+const REF_MUK = (12.011 * 15.999 / 28.01) * 510;
+function amplitudePm(info) { return 26 * Math.pow(REF_MUK / (info.mu * info.k), 0.25); }
+function dispRadius(el) { return 12 + 0.26 * EL[el].cov; }           // pm, for drawing
+
+// ---------------- Colour helpers ----------------
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(h, target, t) { const a = hexRgb(h); return `rgb(${a.map((v, i) => Math.round(v + (target[i] - v) * t)).join(',')})`; }
+const lighten = (h, t) => mix(h, [255, 255, 255], t);
+const darken = (h, t) => mix(h, [0, 0, 0], t);
+function rgba(h, a) { const c = hexRgb(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+
+// ---------------- State ----------------
+const slots = [
+    { a: 'C', b: 'O', order: 3 },
+    { a: 'C', b: 'O', order: 2 },
+    { a: 'C', b: 'O', order: 1 }
+].map((s, i) => ({ ...s, hyb: 'sp3', n: 0, E: null, trans: null, absorbAt: -1, vis: 1, idx: i, color: SLOT_COLORS[i], info: null, spawn: -1, dying: -1, x: null, phase: 0, markerX: null }));
+
+let paused = false, speed = 1, showDetails = false, showMorse = false, morseT = 0;
+let MR = null;   // shared Morse axis ranges (animated)
+let focus = null, focusT = 0;   // slot shown on its own after clicking its Morse graph
+const photons = [];
+let graphRects = [];
+const IR_COLOR = '#ff6b3d';
+const LEVEL_ENERGY = (s, n) => s.info.morse.G[n];
+let now = 0;
+
+// ---------------- Controls ----------------
+const groupsEl = document.getElementById('bond-groups');
+function atomSelect(val) {
+    const s = document.createElement('select');
+    ['NONE', ...ATOMS].forEach(e => { const o = document.createElement('option'); o.value = e; o.textContent = e; s.appendChild(o); });
+    s.value = val; return s;
+}
+slots.forEach(slot => {
+    const g = document.createElement('div'); g.className = 'bond-group';
+    g.style.borderColor = rgba(slot.color, 0.55);
+    const tag = document.createElement('span'); tag.className = 'bond-tag'; tag.style.color = slot.color; tag.textContent = `BOND ${slot.idx + 1}`;
+    const sa = atomSelect(slot.a), sb = atomSelect(slot.b);
+    const so = document.createElement('select');
+    sa.setAttribute('aria-label', `Bond ${slot.idx + 1} first atom`);
+    sb.setAttribute('aria-label', `Bond ${slot.idx + 1} second atom`);
+    g.append(tag, sa, so, sb);
+    groupsEl.appendChild(g);
+    slot.ui = { sa, sb, so };
+    const onChange = () => {
+        slot.a = sa.value; slot.b = sb.value;
+        refreshOrderOptions(slot);
+        if (so.dataset.mode === 'hyb') { slot.hyb = so.value; slot.order = 1; } else slot.order = +so.value;
+        applySlot(slot);
+    };
+    sa.addEventListener('change', onChange); sb.addEventListener('change', onChange); so.addEventListener('change', onChange);
+    refreshOrderOptions(slot);
+});
+function refreshOrderOptions(slot) {
+    const { so } = slot.ui;
+    const mode = isCH(slot.a, slot.b) ? 'hyb' : 'order';
+    if (so.dataset.mode !== mode) {
+        so.innerHTML = '';
+        const add = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; so.appendChild(o); };
+        if (mode === 'hyb') { HYBS.forEach(h => add(h.key, `C ${h.name}`)); so.value = slot.hyb; }
+        else { [1, 2, 3].forEach(n => add(n, `${ORDER_SYM[n]}  ${ORDER_NAME[n]}`)); so.value = String(slot.order); }
+        so.dataset.mode = mode;
+        so.setAttribute('aria-label', `Bond ${slot.idx + 1} ${mode === 'hyb' ? 'carbon hybridization' : 'bond order'}`);
+    }
+    const mx = maxOrder(slot.a, slot.b);
+    so.disabled = mx === 0;
+    if (mode === 'order') {
+        [...so.options].forEach(o => { o.disabled = mx > 0 && +o.value > mx; });
+        if (mx > 0 && +so.value > mx) so.value = mx;
+    }
+}
+function applySlot(slot) {
+    const visible = !!slot.info && slot.dying < 0;
+    if (maxOrder(slot.a, slot.b) === 0) {
+        if (visible) slot.dying = now;
+        if (focus === slot) exitFocus();
+        return;
+    }
+    const wasShown = visible;
+    slot.info = bondInfo(slot.a, slot.b, slot.order, slot.hyb);
+    slot.spawn = now; slot.dying = -1; slot.phase = 0;
+    slot.n = 0; slot.E = null; slot.trans = null; slot.absorbAt = -1; slot.relax = null; slot.nr = null;
+    for (let i = photons.length - 1; i >= 0; i--) if (photons[i].slot === slot) photons.splice(i, 1);
+    if (!wasShown) { slot.x = null; slot.gx = null; slot.markerX = null; }
+}
+
+const speedEl = document.getElementById('speed'), speedVal = document.getElementById('speed-val');
+speedEl.addEventListener('input', () => { speed = +speedEl.value; speedVal.textContent = (speed < 1 && Math.round(speed * 100) % 10 ? speed.toFixed(2) : speed.toFixed(1)) + '×'; });
+const pauseBtn = document.getElementById('btn-pause');
+pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.textContent = paused ? 'PLAY' : 'PAUSE'; });
+const detBtn = document.getElementById('btn-details');
+const morseBtn = document.getElementById('btn-morse');
+morseBtn.addEventListener('click', () => { showMorse = !showMorse; morseBtn.classList.toggle('on', showMorse); morseBtn.textContent = showMorse ? 'HIDE MORSE POTENTIAL' : 'SHOW MORSE POTENTIAL'; });
+detBtn.addEventListener('click', () => { showDetails = !showDetails; detBtn.innerHTML = `μ &amp; k: ${showDetails ? 'ON' : 'OFF'}`; });
+
+// Slide-down bar: open on hover, close when the pointer leaves (and drop focus so it can close). Tap the tab on touch screens.
+const wrap = document.getElementById('controls-wrap');
+wrap.addEventListener('mouseleave', () => setTimeout(() => {
+    if (!wrap.matches(':hover')) { if (wrap.contains(document.activeElement)) document.activeElement.blur(); wrap.classList.remove('open'); }
+}, 250));
+document.getElementById('controls-tab').addEventListener('click', () => wrap.classList.toggle('open'));
+document.getElementById('stage').addEventListener('pointerdown', () => { wrap.classList.remove('open'); if (wrap.contains(document.activeElement)) document.activeElement.blur(); });
+
+// ---------------- Canvas ----------------
+const cv = document.getElementById('stage'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize); resize();
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+
+const RULER_H = 136;
+// Side by side on wide screens; stacked in rows on narrow (phone) screens. mT (0..1) makes room for the Morse graphs.
+function layout(n, mT) {
+    const stageTop = 34, stageBot = H - RULER_H;
+    const stageH = stageBot - stageTop;
+    const stacked = W < 720 && n > 1;
+    // One common scale (px per pm) so bond lengths and atom sizes can be compared across bonds.
+    let scale, cardScale, pos, PW, PH, gOff;
+    if (!stacked) {
+        scale = clamp(Math.min((W / 3) * 0.86 / 420, stageH * 0.42 / 110), 0.25, 1.6);
+        cardScale = clamp(W / Math.max(n, 1) / 260, 0.55, 1);
+        PW = Math.min(W / n * 0.92, 500);
+        PH = clamp(stageH - 175 * cardScale - 90, 120, 260);
+        gOff = 50 * scale + 22;
+        const cardSpace = 50 * scale + 135 * cardScale;
+        const yOff = stageTop + stageH * 0.64;
+        const yOn = stageTop + Math.max(4, (stageH - (cardSpace + gOff + PH)) / 2) + cardSpace;
+        pos = i => ({ x: W * (i + 0.5) / n, y: yOff + (yOn - yOff) * mT });
+    } else {
+        const rowH = stageH / n;
+        scale = clamp(Math.min(W * 0.8 / 420, rowH * (0.3 - 0.12 * mT) / 110), 0.2, 1.6);
+        cardScale = clamp(Math.min(W / 300, rowH * (1 - 0.55 * mT) / 190), 0.4, 1);
+        PW = W * 0.94; PH = Math.max(70, rowH * 0.5 - 12); gOff = 50 * scale + 10;
+        pos = i => ({ x: W / 2, y: stageTop + rowH * i + rowH * (0.74 - 0.32 * mT) });
+    }
+    const gpos = i => { const p = pos(i); return { x: p.x, y: p.y + gOff }; };
+    return { scale, cardScale, pos, gpos, PW, PH, gOff };
+}
+// One bond, enlarged, with a big graph and room for the excitation buttons underneath.
+function layoutFocus() {
+    const stageTop = 34, stageH = H - RULER_H - stageTop;
+    if (W >= 900) {
+        // bond (with its card and buttons) on the left, graph on the right
+        const leftW = W * 0.42;
+        const scale = clamp(Math.min(leftW * 1.0 / 420, stageH * 0.3 / 110), 0.3, 2.4);
+        const cardScale = clamp(leftW / 320, 0.6, 1.15);
+        const cardSpace = 50 * scale + 157 * cardScale, below = 50 * scale + 26 + 50;
+        const y = stageTop + Math.max(4, (stageH - (cardSpace + below)) / 2) + cardSpace;
+        const x = leftW / 2 + 16;
+        const PW = Math.min(W - leftW - 40, 780), PH = clamp(stageH - 24, 300, 660);
+        const gx = leftW + (W - leftW) / 2 - 8, gy = stageTop + (stageH - PH) / 2;
+        return { scale, cardScale, pos: () => ({ x, y }), gpos: () => ({ x: gx, y: gy }), PW, PH, gOff: 0, barOff: 50 * scale + 46 };
+    }
+    // narrow screens: bond on top, graph underneath, buttons at the bottom
+    const barH = 84;
+    const scale = clamp(Math.min(W * 0.6 / 420, stageH * 0.18 / 110), 0.3, 2.2);
+    const cardScale = clamp(W / 380, 0.6, 1.1);
+    const cardSpace = 50 * scale + 157 * cardScale;
+    const gOff = 50 * scale + 24;
+    const PW = W * 0.94;
+    const PH = clamp(stageH - cardSpace - gOff - barH, 200, 520);
+    const y = stageTop + Math.max(4, (stageH - (cardSpace + gOff + PH + barH)) / 2) + cardSpace;
+    return { scale, cardScale, pos: () => ({ x: W / 2, y }), gpos: () => ({ x: W / 2, y: y + gOff }), PW, PH, gOff, barOff: gOff + PH + 12 };
+}
+function enterFocus(slot) { focus = slot; }
+function exitFocus() { focus = null; }
+
+function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawBackground() {
+    const g = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.max(W, H) * 0.75);
+    g.addColorStop(0, '#16213a'); g.addColorStop(1, '#070b16');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+function drawSphere(x, y, r, color, flash) {
+    if (r <= 0.5) return;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = r * 0.5; ctx.shadowOffsetY = r * 0.18;
+    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.05, x, y, r);
+    g.addColorStop(0, lighten(color, 0.8)); g.addColorStop(0.3, lighten(color, 0.18));
+    g.addColorStop(0.75, color); g.addColorStop(1, darken(color, 0.6));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (flash > 0) {
+        ctx.save(); ctx.globalAlpha *= flash; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+}
+
+function drawStick(x1, y1, x2, y2, w, color) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = darken(color, 0.35); ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.strokeStyle = lighten(color, 0.2); ctx.lineWidth = w * 0.62; ctx.beginPath(); ctx.moveTo(x1, y1 - w * 0.12); ctx.lineTo(x2, y2 - w * 0.12); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = Math.max(1, w * 0.18); ctx.beginPath(); ctx.moveTo(x1, y1 - w * 0.25); ctx.lineTo(x2, y2 - w * 0.25); ctx.stroke();
+}
+
+function drawSymbol(x, y, r, el) {
+    if (r < 6) return;
+    ctx.save();
+    ctx.font = `800 ${Math.round(r * (el.length > 1 ? 0.78 : 0.92))}px ui-sans-serif, system-ui, Arial, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = EL[el].ink === '#ffffff' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 3;
+    ctx.fillStyle = EL[el].ink; ctx.fillText(el, x, y + r * 0.04);
+    ctx.restore();
+}
+
+function drawFlash(cx, cy, size, t, color) {
+    const T = 0.85; if (t < 0 || t > T) return;
+    const p = t / T, e = easeOutCubic(p), a = Math.pow(1 - p, 1.6);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const R = size * (0.25 + 1.6 * e);
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.25, rgba(color, 0.75 * a)); g.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    // rays
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+        const ang = i * Math.PI / 6 + 0.26;
+        const r1 = size * (0.15 + 0.6 * e), r2 = size * (0.35 + 1.25 * e) * (i % 2 ? 0.75 : 1);
+        ctx.lineWidth = Math.max(1, size * 0.03 * (1 - p));
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1); ctx.lineTo(cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2); ctx.stroke();
+    }
+    // shock ring
+    ctx.strokeStyle = rgba(color, 0.9 * a); ctx.lineWidth = Math.max(1, size * 0.04 * (1 - p));
+    ctx.beginPath(); ctx.arc(cx, cy, size * (0.3 + 1.9 * e), 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+}
+
+function formatNu(nu) { return Math.round(nu).toLocaleString('en-US'); }
+function bondLabel(info) {
+    const sym = el => (info.hyb && el === 'C') ? `C(${HYBS.find(h => h.key === info.hyb).sup})` : el;
+    return `${sym(info.a)}${ORDER_SYM[info.order]}${sym(info.b)}`;
+}
+
+function drawCard(cx, bottomY, slot, alpha, rise) {
+    const info = slot.info;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    const big = `${formatNu(info.nu)} cm⁻¹`;
+    ctx.font = '800 28px ui-sans-serif, system-ui, Arial, sans-serif';
+    const wBig = ctx.measureText('ν = ' + big).width + 36;
+    const det = `μ = ${info.mu.toFixed(2)} u    k = ${info.k.toLocaleString('en-US')} N/m`;
+    ctx.font = '600 13px ui-sans-serif, system-ui, Arial, sans-serif';
+    const wDet = showDetails ? ctx.measureText(det).width : 0;
+    ctx.font = '700 12px ui-sans-serif, system-ui, Arial, sans-serif';
+    const wHead = ctx.measureText(`${bondLabel(info)}  ${ORDER_NAME[info.order].toUpperCase()} BOND STRETCH`).width + 28;
+    const stateTxt = slot.stateLine || '';
+    ctx.font = '700 13px ui-sans-serif, system-ui, Arial, sans-serif';
+    const wState = stateTxt ? ctx.measureText(stateTxt).width + 28 : 0;
+    const absTxt = `IR absorption (0→1): ${fmt(info.morse.fund)} cm⁻¹`;
+    ctx.font = '700 13px ui-sans-serif, system-ui, Arial, sans-serif';
+    const wAbs = ctx.measureText(absTxt).width + 28;
+    const w = Math.max(wBig, wDet + 28, wHead, wState, wAbs, 170), h = (showDetails ? 98 : 76) + 22 + (stateTxt ? 22 : 0);
+    const x = cx - w / 2, y = bottomY - h - rise;
+    // connector
+    ctx.strokeStyle = rgba(slot.color, 0.45); ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, y + h); ctx.lineTo(cx, bottomY + 14 - rise); ctx.stroke(); ctx.setLineDash([]);
+    // card
+    ctx.shadowColor = rgba(slot.color, 0.45); ctx.shadowBlur = 18;
+    roundRect(x, y, w, h, 10); ctx.fillStyle = 'rgba(15,23,42,0.9)'; ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = rgba(slot.color, 0.85); ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#9ca3af'; ctx.font = '700 12px ui-sans-serif, system-ui, Arial, sans-serif';
+    ctx.fillText(`${bondLabel(info)}  ${ORDER_NAME[info.order].toUpperCase()} BOND STRETCH`, cx, y + 18);
+    // "ν̃ = 1,716 cm⁻¹": italic serif symbol, then the number
+    const symFont = 'italic 700 28px "Times New Roman", Georgia, serif', numFont = '800 28px ui-sans-serif, system-ui, Arial, sans-serif';
+    ctx.font = symFont; const wSym = ctx.measureText('ν ').width;
+    ctx.font = numFont; const wNum = ctx.measureText('= ' + big).width;
+    const x0 = cx - (wSym + wNum) / 2;
+    ctx.fillStyle = slot.color; ctx.textAlign = 'left';
+    ctx.font = symFont; ctx.fillText('ν', x0, y + 60);
+    const wv = ctx.measureText('ν').width; ctx.font = '700 22px "Times New Roman", Georgia, serif'; ctx.fillText('~', x0 + wv * 0.22, y + 42);
+    ctx.font = numFont; ctx.fillText('= ' + big, x0 + wSym, y + 60);
+    ctx.textAlign = 'center';
+    if (showDetails) { ctx.fillStyle = '#d1d5db'; ctx.font = '600 13px ui-sans-serif, system-ui, Arial, sans-serif'; ctx.fillText(det, cx, y + 84); }
+    ctx.fillStyle = '#fca5a5'; ctx.font = '700 13px ui-sans-serif, system-ui, Arial, sans-serif';
+    ctx.fillText(absTxt, cx, y + (showDetails ? 106 : 84));
+    if (stateTxt) { ctx.fillStyle = slot.n > 0 ? '#fdba74' : '#e5e7eb'; ctx.font = '700 13px ui-sans-serif, system-ui, Arial, sans-serif'; ctx.fillText(stateTxt, cx, y + h - 12); }
+    ctx.restore();
+}
+
+// ---------------- Morse potential graph ----------------
+function niceStep(range, maxTicks) {
+    const raw = range / maxTicks, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p;
+    return 10 * p;
+}
+const fmt = v => Math.round(v).toLocaleString('en-US');
+function morseTargets(list) {
+    let rLo = Infinity, rHi = -Infinity, Dmax = 0;
+    list.forEach(s => {
+        const M = s.info.morse;
+        Dmax = Math.max(Dmax, M.De);
+    });
+    list.forEach(s => {
+        const M = s.info.morse;
+        const sw = Math.sqrt((M.De + 0.14 * Dmax) / M.De);              // left wall up to +14% of the deepest well
+        rLo = Math.min(rLo, s.info.r - Math.log(1 + sw) / M.a);
+        rHi = Math.max(rHi, s.info.r + 3.2 / M.a);
+    });
+    return { rLo: Math.max(0, rLo), rHi, Dmax };
+}
+function drawMorse(s, cx, top, PW, PH, R, alpha) {
+    const info = s.info, M = info.morse, col = s.color;
+    const SANS = 'ui-sans-serif, system-ui, Arial, sans-serif';
+    ctx.save(); ctx.globalAlpha *= alpha;
+    const x0 = cx - PW / 2;
+    graphRects.push({ slot: s, x: x0, y: top, w: PW, h: PH });
+    roundRect(x0, top, PW, PH, 10); ctx.fillStyle = 'rgba(15,23,42,0.9)'; ctx.fill();
+    ctx.strokeStyle = rgba(col, 0.6); ctx.lineWidth = 1.2; ctx.stroke();
+    const compact = PH < 140, big = focus === s && PH >= 180, wideP = PW > 460;
+    const roomy = PW > 600;
+    const hf = compact ? 9 : big ? (roomy ? 18 : 12) : 11, hy = top + (compact ? 13 : big ? (roomy ? 28 : 24) : 16);
+    ctx.font = `700 ${hf}px ${SANS}`; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#9ca3af'; ctx.textAlign = 'left';
+    ctx.fillText(`MORSE POTENTIAL · ${bondLabel(info)}`, x0 + 12, hy);
+    ctx.fillStyle = '#d1d5db'; ctx.textAlign = 'right'; ctx.fillText(`Dₑ = ${fmt(M.De)} kJ/mol   rₑ = ${info.r} pm`, x0 + PW - 12, hy);
+
+    let mx, my, mainW, plotH, zx, zy, zoomW, zh;
+    if (big) {
+        // zoomed-in view: the close-up of the well bottom sits above the full curve
+        const padL = roomy ? 86 : 52, padR = roomy ? 22 : 12, padT = roomy ? 86 : 56, padB = roomy ? 52 : 34, gapV = roomy ? 40 : 22;
+        const innerW = PW - padL - padR, innerH = PH - padT - padB;
+        zh = innerH * (roomy ? 0.64 : 0.56); zoomW = Math.min(innerW, zh * 1.75);
+        zx = x0 + padL + (innerW - zoomW) / 2; zy = top + padT;
+        mx = x0 + padL; mainW = innerW; my = zy + zh + gapV; plotH = innerH - zh - gapV;
+    } else {
+        const padL = compact ? 30 : 42, padT = compact ? 20 : 26, padB = compact ? 16 : 22, gap = 14;
+        plotH = PH - padT - padB; const innerW = PW - padL - 10 - gap;
+        mainW = innerW * 0.6; zoomW = innerW - mainW;
+        mx = x0 + padL; my = top + padT;
+        zx = mx + mainW + gap; zy = my; zh = plotH - (compact ? 0 : 14);
+    }
+    const eTop = 0.14 * R.Dmax, eBot = -1.07 * R.Dmax;
+    const X = r => mx + (r - R.rLo) / (R.rHi - R.rLo) * mainW;
+    const Y = e => my + (eTop - e) / (eTop - eBot) * plotH;
+    const fs = compact ? 8 : big ? (roomy ? 16 : 11) : 9;
+
+    // axes + ticks (shared across all graphs so depths and positions compare directly)
+    ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, my + plotH); ctx.lineTo(mx + mainW, my + plotH); ctx.stroke();
+    ctx.font = `600 ${fs}px ${SANS}`; ctx.fillStyle = '#9ca3af';
+    const es = niceStep(R.Dmax, clamp(Math.floor(plotH / (fs * 2.6)), 1, 4));
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let e = 0; e >= eBot; e -= es) {
+        const yy = Y(e); ctx.beginPath(); ctx.moveTo(mx - 3, yy); ctx.lineTo(mx, yy); ctx.stroke();
+        ctx.fillText(e === 0 ? '0' : `−${fmt(-e)}`, mx - (big ? 8 : 6), yy);
+    }
+    const rs = niceStep(R.rHi - R.rLo, compact ? 3 : 4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let r = Math.ceil(R.rLo / rs) * rs; r <= R.rHi; r += rs) {
+        const xx = X(r); ctx.beginPath(); ctx.moveTo(xx, my + plotH); ctx.lineTo(xx, my + plotH + 3); ctx.stroke();
+        ctx.fillText(String(r), xx, my + plotH + (big ? 6 : 4));
+    }
+    if (!compact) { ctx.textAlign = 'right'; ctx.fillText('r (pm)', mx + mainW, my + plotH + (big && roomy ? 26 : big ? 20 : 12)); }
+    if (!compact) {
+        ctx.save(); ctx.translate(x0 + (big && roomy ? 18 : big ? 14 : 9), my + plotH / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('E (kJ/mol)', 0, 0); ctx.restore();
+    }
+    // dissociation limit
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(156,163,175,0.6)';
+    ctx.beginPath(); ctx.moveTo(mx, Y(0)); ctx.lineTo(mx + mainW, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#6b7280'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('dissociation', mx + mainW - 2, Y(0) - 1);
+
+    // zoom window around the bottom of the well (v = 0, 1, 2)
+    const [tl2, tr2] = M.turn(M.G[2]);
+    const w2 = tr2 - tl2;
+    const zr0 = tl2 - 0.25 * w2, zr1 = tr2 + 0.45 * w2;
+    const zE0 = -M.De - 0.08 * M.G[2], zE1 = -M.De + M.G[2] + 0.8 * (M.G[2] - M.G[1]);
+
+    ctx.save(); ctx.beginPath(); ctx.rect(mx + 1, my, mainW, plotH); ctx.clip();
+    // Dₑ marker
+    ctx.strokeStyle = 'rgba(209,213,219,0.45)'; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(X(info.r), Y(0)); ctx.lineTo(X(info.r), Y(-M.De)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#d1d5db'; ctx.font = `italic 700 ${fs + 2}px "Times New Roman", Georgia, serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('Dₑ', X(info.r) + 4, Y(-M.De / 2));
+    // curve
+    ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.shadowColor = col; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    for (let i = 0; i <= 260; i++) {
+        const r = R.rLo + i / 260 * (R.rHi - R.rLo); const e = Math.min(M.V(r), eTop * 3);
+        i ? ctx.lineTo(X(r), Y(e)) : ctx.moveTo(X(r), Y(e));
+    }
+    ctx.stroke(); ctx.shadowBlur = 0;
+    // zoom box
+    let bx0 = X(zr0), bx1 = X(zr1), by0 = Y(zE1), by1 = Y(zE0);
+    if (bx1 - bx0 < 10) { const c = (bx0 + bx1) / 2; bx0 = c - 5; bx1 = c + 5; }
+    if (by1 - by0 < 7) { const c = (by0 + by1) / 2; by0 = c - 3.5; by1 = c + 3.5; }
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+    ctx.restore();
+
+    // connectors from the boxed region to the close-up
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (big) { ctx.moveTo(bx0, by0); ctx.lineTo(zx, zy + zh); ctx.moveTo(bx1, by0); ctx.lineTo(zx + zoomW, zy + zh); }
+    else { ctx.moveTo(bx1, by0); ctx.lineTo(zx, zy); ctx.moveTo(bx1, by1); ctx.lineTo(zx, zy + zh); }
+    ctx.stroke(); ctx.setLineDash([]);
+    roundRect(zx, zy, zoomW, zh, 6); ctx.fillStyle = 'rgba(2,6,23,0.7)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.stroke();
+
+    const ZX = r => zx + (r - zr0) / (zr1 - zr0) * zoomW;
+    const ZY = e => zy + (zE1 - e) / (zE1 - zE0) * zh;
+    ctx.save(); roundRect(zx, zy, zoomW, zh, 6); ctx.clip();
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= 140; i++) {
+        const r = zr0 + i / 140 * (zr1 - zr0); const e = Math.min(M.V(r), zE1 + (zE1 - zE0));
+        i ? ctx.lineTo(ZX(r), ZY(e)) : ctx.moveTo(ZX(r), ZY(e));
+    }
+    ctx.stroke();
+    // vibrational levels (the current one drawn in the bond's colour)
+    ctx.font = `700 ${fs}px ${SANS}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    M.G.forEach((g, v) => {
+        const [l, r] = M.turn(g), yy = ZY(-M.De + g);
+        const cur = v === s.n;
+        ctx.strokeStyle = cur ? col : 'rgba(255,255,255,0.75)'; ctx.lineWidth = (cur ? 2.2 : 1.4) * (big ? 1.3 : 1);
+        ctx.beginPath(); ctx.moveTo(ZX(l), yy); ctx.lineTo(ZX(r), yy); ctx.stroke();
+        ctx.fillStyle = cur ? col : '#e5e7eb'; ctx.fillText(big ? `n = ${v}` : `n=${v}`, ZX(r) + 4, yy);
+    });
+    // transitions: fundamental 0→1 (solid) and first overtone 0→2 (dashed); the one in progress glows
+    const lvlY = v => ZY(-M.De + M.G[v]);
+    const active = s.trans && now < s.trans.until ? s.trans : null;
+    const arrow = (x, from, to, dashed, label, side) => {
+        const up = to > from, y0 = lvlY(from) + (up ? -2 : 2), y1 = lvlY(to) + (up ? 2 : -2);
+        if (Math.abs(y0 - y1) < 8) return;
+        const on = active && active.from === from && active.to === to;
+        const c = on ? IR_COLOR : col;
+        ctx.save();
+        ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = on ? 2.6 + Math.sin(now * 14) * 0.8 : 1.8;
+        if (on) { ctx.shadowColor = IR_COLOR; ctx.shadowBlur = 12; }
+        if (dashed) ctx.setLineDash([4, 3]);
+        const hd = up ? 5 : -5;
+        ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1 + hd); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x - 4, y1 + (up ? 6 : -6)); ctx.lineTo(x + 4, y1 + (up ? 6 : -6)); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    };
+    const ax = ZX(info.r);
+    ctx.font = `700 ${fs}px ${SANS}`; ctx.textBaseline = 'middle';
+    const sep = big ? (roomy ? 16 : 11) : 7;
+    arrow(ax - sep, 0, 1, false);
+    arrow(ax + sep, 0, 2, true);
+    const arrowLabels = compact ? [] : [
+        { text: '0→1', x: ax - sep - 7, y: (lvlY(0) + lvlY(1)) / 2, align: 'right', on: active && active.from === 0 && active.to === 1 },
+        { text: '0→2', x: ax + sep + 7, y: (lvlY(1) + lvlY(2)) / 2, align: 'left', on: active && active.from === 0 && active.to === 2 }
+    ];
+    if (active && active.to > active.from && active.from !== 0) arrow(ax + sep * 5.5, active.from, active.to, false, '', 'left');
+    // non-radiative decay: wavy downward arrow for the step in progress
+    if (s.nr && now < s.nr.until) {
+        const xw = ax - sep * 5.5, y0 = lvlY(s.nr.from) + 3, y1 = lvlY(s.nr.to) - 3;
+        const fade = clamp((s.nr.until - now) / 0.3, 0, 1);
+        ctx.save(); ctx.globalAlpha *= fade; ctx.strokeStyle = '#4ade80'; ctx.fillStyle = '#4ade80'; ctx.lineWidth = big ? 2.2 : 1.6;
+        ctx.shadowColor = '#22c55e'; ctx.shadowBlur = 8;
+        ctx.beginPath();
+        for (let yy = y0; yy <= y1 - 6; yy += 1) {
+            const xx = xw + Math.sin((yy - y0) / 4 - now * 10) * 3.5;
+            yy === y0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+        }
+        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xw, y1); ctx.lineTo(xw - 4, y1 - 7); ctx.lineTo(xw + 4, y1 - 7); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+    // the molecule: a dot riding the current energy, oscillating between its classical turning points in step with the animation
+    const Ecur = s.E ?? M.G[0];
+    const [l0, r0] = M.turn(Ecur);
+    const dx = ZX(l0 + (r0 - l0) * (0.5 + 0.5 * Math.sin(s.phase)));
+    ctx.fillStyle = '#ffffff'; ctx.shadowColor = col; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(dx, ZY(-M.De + Ecur), big ? (roomy ? 6 : 4.5) : 3.2, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+    // transition labels last, on a dark backing so the curve and level lines never run through them
+    ctx.font = `700 ${fs}px ${SANS}`; ctx.textBaseline = 'middle';
+    arrowLabels.forEach(l => {
+        const w = ctx.measureText(l.text).width, pad = Math.max(3, fs * 0.3);
+        const bx = l.align === 'right' ? l.x - w - pad : l.x - pad;
+        roundRect(bx, l.y - fs * 0.6 - pad / 2, w + 2 * pad, fs * 1.2 + pad, 4);
+        ctx.fillStyle = 'rgba(2,6,23,0.92)'; ctx.fill();
+        ctx.fillStyle = l.on ? IR_COLOR : col; ctx.textAlign = l.align; ctx.fillText(l.text, l.x, l.y + 0.5);
+    });
+    ctx.restore();
+    const zoomX = ((eTop - eBot) / plotH) / ((zE1 - zE0) / zh);
+    ctx.fillStyle = '#9ca3af'; ctx.font = `600 ${Math.max(8, fs - 2)}px ${SANS}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    if (!compact) ctx.fillText(`zoom ×${zoomX >= 10 ? fmt(zoomX) : zoomX.toFixed(1)}`, zx + zoomW - 6, zy + zh - 4);
+    ctx.textBaseline = 'top';
+    if (!compact) {
+        ctx.textAlign = 'center'; ctx.fillStyle = '#9ca3af';
+        if (big) {
+            ctx.fillStyle = '#d1d5db'; ctx.font = `600 ${fs}px ${SANS}`;
+            ctx.fillText(wideP ? `0→1 (fundamental): ${fmt(M.fund)} cm⁻¹     0→2 (1st overtone): ${fmt(M.over)} cm⁻¹`
+                               : `0→1: ${fmt(M.fund)}   0→2: ${fmt(M.over)} cm⁻¹`, x0 + PW / 2, top + (roomy ? 44 : 30));
+            ctx.fillStyle = '#6b7280'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+            ctx.font = `600 ${roomy ? 13 : 10}px ${SANS}`; ctx.fillText('click graph to return', x0 + 12, top + PH - 8);
+        } else ctx.fillText(`0→1: ${fmt(M.fund)}  0→2: ${fmt(M.over)} cm⁻¹`, zx + zoomW / 2, zy + zh + 4);
+    }
+    ctx.restore();
+}
+
+// ---------------- IR photons ----------------
+function excite(slot, to) {
+    if (!slot.info || photons.some(p => p.slot === slot) || to <= slot.n) return;
+    const from = slot.n, M = slot.info.morse;
+    const cm = (M.G[to] - M.G[from]) / CM_TO_KJ;
+    photons.push({ slot, from, to, cm, t0: now, dur: 1.5 });
+    slot.trans = { from, to, until: now + 2.3 };
+}
+// Non-radiative decay: the extra vibrational energy is passed to the surroundings as heat, one level at a time.
+function relax(slot) {
+    if (!slot.info || photons.some(p => p.slot === slot) || slot.n === 0 || slot.relax) return;
+    slot.trans = null;
+    slot.relax = { t0: now, last: now - 0.45 };
+}
+function drawPhoton(p) {
+    const s = p.slot, t = (now - p.t0) / p.dur;
+    // absorbed photons come in from the top left; emitted photons leave toward the top right
+    const start = { x: -80, y: 20 }, end = { x: s.x, y: s.y }, e = t;
+    const hx = start.x + (end.x - start.x) * e, hy = start.y + (end.y - start.y) * e;
+    const len = Math.hypot(end.x - start.x, end.y - start.y), ux = (end.x - start.x) / len, uy = (end.y - start.y) / len;
+    const px = -uy, py = ux;
+    const lambda = clamp(60000 / p.cm, 9, 70);        // drawn wavelength: shorter for a higher-energy photon
+    const L = 190, A = 9;
+    const pts = [];
+    for (let u = -L; u <= 0; u += 2) {
+        const env = Math.exp(-Math.pow((u + L * 0.45) / (L * 0.32), 2));
+        const off = A * env * Math.sin(2 * Math.PI * u / lambda - now * 18);
+        pts.push([hx + ux * u + px * off, hy + uy * u + py * off]);
+    }
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    [[7, 0.25], [3.5, 0.6], [1.6, 1]].forEach(([w, a]) => {
+        ctx.strokeStyle = a === 1 ? '#ffe2d6' : rgba(IR_COLOR, a); ctx.lineWidth = w;
+        ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    });
+    const g = ctx.createRadialGradient(hx - ux * L * 0.45, hy - uy * L * 0.45, 0, hx - ux * L * 0.45, hy - uy * L * 0.45, 46);
+    g.addColorStop(0, rgba(IR_COLOR, 0.35)); g.addColorStop(1, rgba(IR_COLOR, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(hx - ux * L * 0.45, hy - uy * L * 0.45, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+}
+
+// ---------------- IR ruler ----------------
+const NU_MAX = 4500, NU_MIN = 150;
+function rulerX(nu, L, R) { return L + (NU_MAX - nu) / (NU_MAX - NU_MIN) * (R - L); }
+function drawRuler(visible) {
+    const L = 36, R = W - 36, axisY = H - 40, top = H - RULER_H + 18;
+    ctx.save();
+    ctx.fillStyle = 'rgba(17,24,39,0.82)'; ctx.fillRect(0, H - RULER_H, W, RULER_H);
+    ctx.strokeStyle = 'rgba(75,85,99,0.7)'; ctx.beginPath(); ctx.moveTo(0, H - RULER_H + 0.5); ctx.lineTo(W, H - RULER_H + 0.5); ctx.stroke();
+    const regions = [[4000, 2500, 'X–H STRETCH'], [2500, 2000, 'TRIPLE'], [2000, 1500, 'DOUBLE'], [1500, 400, 'FINGERPRINT (SINGLE BONDS)']];
+    const tints = ['#60a5fa', '#a78bfa', '#34d399', '#9ca3af'];
+    ctx.font = '700 10px ui-sans-serif, system-ui, Arial, sans-serif'; ctx.textAlign = 'center';
+    regions.forEach(([a, b, name], i) => {
+        const x1 = rulerX(a, L, R), x2 = rulerX(b, L, R);
+        ctx.fillStyle = rgba(tints[i], 0.08); ctx.fillRect(x1, top, x2 - x1, axisY - top);
+        ctx.fillStyle = rgba(tints[i], 0.75);
+        const txt = (x2 - x1) < ctx.measureText(name).width + 6 ? name.split(' ')[0] : name;
+        if ((x2 - x1) > ctx.measureText(txt).width + 4) ctx.fillText(txt, (x1 + x2) / 2, top + 12);
+    });
+    ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(L, axisY); ctx.lineTo(R, axisY); ctx.stroke();
+    ctx.fillStyle = '#9ca3af'; ctx.font = '600 10px ui-sans-serif, system-ui, Arial, sans-serif';
+    const step = (R - L) < 520 ? 1000 : 500;
+    for (let v = 4500; v >= 500; v -= step) {
+        const x = rulerX(v, L, R);
+        ctx.beginPath(); ctx.moveTo(x, axisY); ctx.lineTo(x, axisY + 5); ctx.stroke();
+        ctx.fillText(v.toString(), x, axisY + 16);
+    }
+    ctx.fillStyle = '#d1d5db'; ctx.font = '700 11px ui-sans-serif, system-ui, Arial, sans-serif';
+    ctx.textAlign = 'left'; ctx.fillText('IR ABSORPTION, 0→1 (cm⁻¹)', L, H - 6);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#6b7280'; ctx.font = '600 10px ui-sans-serif, system-ui, Arial, sans-serif';
+    const slow = (C_CM * BASE_RATE / speed);
+    const ex = Math.floor(Math.log10(slow)), mant = (slow / Math.pow(10, ex)).toFixed(1);
+    ctx.fillText(W < 600 ? `slowed ≈ ${mant} × 10${toSup(ex)}×` : `Motion slowed ≈ ${mant} × 10${toSup(ex)}×  ·  displacements exaggerated`, R, H - 6);
+
+    // markers (sorted so close labels stagger)
+    const ms = visible.map(s => { const tx = rulerX(s.info.morse.fund, L, R); if (s.markerX == null) s.markerX = tx; return s; })
+        .sort((p, q) => p.markerX - q.markerX);
+    let lastX = -1e9, level = 0;
+    ms.forEach(s => {
+        const x = s.markerX, a = s.alpha * s.vis;
+        level = (x - lastX < 92) ? level + 1 : 0; lastX = x;
+        const tipY = axisY - 2, h = 20 + level * 16;
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = s.color; ctx.lineWidth = 2.5; ctx.shadowColor = s.color; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.moveTo(x, tipY); ctx.lineTo(x, tipY - h); ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = s.color; ctx.beginPath(); ctx.moveTo(x, tipY + 1); ctx.lineTo(x - 5, tipY - 7); ctx.lineTo(x + 5, tipY - 7); ctx.closePath(); ctx.fill();
+        ctx.font = '800 11px ui-sans-serif, system-ui, Arial, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(`${bondLabel(s.info)} ${formatNu(s.info.morse.fund)}`, clamp(x, L + 30, R - 30), tipY - h - 4);
+    });
+    ctx.restore();
+}
+function toSup(n) { const m = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' }; return String(n).split('').map(c => m[c]).join(''); }
+
+// ---------------- Main loop ----------------
+let last = performance.now() / 1000;
+const Lc = {};   // current (animated) layout numbers
+function frame(tms) {
+    const t = tms / 1000; const dt = Math.min(0.05, t - last); last = t; now = t;
+    const k6 = 1 - Math.exp(-dt * 6), k5 = 1 - Math.exp(-dt * 5);
+    drawBackground();
+    graphRects = [];
+
+    // drop slots that finished fading out
+    slots.forEach(s => { if (s.dying >= 0 && now - s.dying > 0.35) { s.info = null; s.dying = -1; s.x = null; s.gx = null; s.markerX = null; } });
+    if (focus && (!focus.info || focus.dying >= 0 || !showMorse)) exitFocus();
+    const shown = slots.filter(s => s.info && s.spawn >= 0 && now >= s.spawn);
+    const live = shown.filter(s => s.dying < 0);
+    const placed = focus ? [focus] : live;
+    const n = Math.max(1, placed.length);
+    morseT += ((showMorse ? 1 : 0) - morseT) * k5;
+    if (Math.abs(morseT - (showMorse ? 1 : 0)) < 0.002) morseT = showMorse ? 1 : 0;
+    focusT += ((focus ? 1 : 0) - focusT) * k5;
+    const tgt = focus ? layoutFocus() : layout(n, morseT);
+    for (const key of ['scale', 'cardScale', 'PW', 'PH', 'gOff']) {
+        Lc[key] = Lc[key] == null ? tgt[key] : Lc[key] + (tgt[key] - Lc[key]) * k6;
+    }
+    const { scale, cardScale, PW, PH, gOff } = Lc;
+    if (placed.length) {
+        const T = morseTargets(placed);
+        if (!MR) MR = { ...T };
+        else for (const key in T) MR[key] += (T[key] - MR[key]) * k5;
+    }
+    const Lr = 36, Rr = W - 36;
+
+    shown.forEach(s => {
+        const order = placed.indexOf(s);
+        s.vis += (((focus && focus !== s) ? 0 : 1) - s.vis) * k6;
+        const tp = order >= 0 ? tgt.pos(order) : { x: s.x ?? W / 2, y: s.y ?? H / 2 };
+        if (s.x == null) { s.x = tp.x; s.y = tp.y; }
+        s.x += (tp.x - s.x) * k6;
+        s.y += (tp.y - s.y) * k6;
+        const y = s.y;
+        const gp = order >= 0 ? tgt.gpos(order) : { x: s.gx ?? s.x, y: s.gy ?? s.y };
+        if (s.gx == null) { s.gx = gp.x; s.gy = gp.y; }
+        s.gx += (gp.x - s.gx) * k6; s.gy += (gp.y - s.gy) * k6;
+        s.markerX = (s.markerX ?? rulerX(s.info.morse.fund, Lr, Rr));
+        s.markerX += (rulerX(s.info.morse.fund, Lr, Rr) - s.markerX) * k6;
+
+        const info = s.info, M = info.morse, age = now - s.spawn;
+        const fadeOut = s.dying >= 0 ? clamp(1 - (now - s.dying) / 0.35, 0, 1) : 1;
+        s.alpha = clamp((age - 0.15) / 0.4, 0, 1) * fadeOut;
+
+        // vibrational energy relaxes smoothly toward the current level (fast jump after a photon is absorbed/emitted)
+        if (s.relax && now - s.relax.last >= 0.9) {
+            if (s.n > 0) { s.nr = { from: s.n, to: s.n - 1, until: now + 0.9 }; s.n -= 1; s.relax.last = now; }
+            else if (now - s.relax.last >= 0.9) s.relax = null;
+        }
+        const Et = M.G[s.n];
+        if (s.E == null) s.E = Et;
+        s.E += (Et - s.E) * (1 - Math.exp(-dt * (s.relax ? 2.5 : 7)));
+        const freq = M.freqAt(s.E);                         // cm^-1; drops slightly as the Morse oscillator climbs
+        s.stateLine = (focus === s && focusT > 0.3) ? `state n = ${s.n}  ·  vibrating at ≈ ${fmt(freq)} cm⁻¹` : '';
+
+        if (!paused && age > 0.3) s.phase += 2 * Math.PI * (freq / BASE_RATE) * speed * dt;
+        const ampRamp = clamp((age - 0.35) / 0.6, 0, 1);
+        // Bond length swings between the classical turning points of the current energy (exaggerated by the same
+        // factor for every level, so n = 1 and n = 2 visibly swing wider than n = 0, and lean outward as the well is asymmetric).
+        const [tl0, tr0] = M.turn(M.G[0]);
+        const X = amplitudePm(info) / ((tr0 - tl0) / 2);
+        const [tl, tr] = M.turn(s.E);
+        let disp = ((tl + tr) / 2 + (tr - tl) / 2 * Math.sin(s.phase) - info.r) * X * ampRamp;
+        disp = Math.max(disp, -(info.r - 0.75 * (dispRadius(info.a) + dispRadius(info.b))));
+        const mA = EL[info.a].m, mB = EL[info.b].m;
+        const grow = age < 0.6 ? clamp(easeOutBack(clamp(age / 0.6, 0, 1)), 0, 1.2) : 1;
+        const shrink = fadeOut;
+        const half = info.r / 2;
+        if (s.vis < 0.01) return;
+        ctx.save(); ctx.globalAlpha = s.vis;
+        // Centre of mass stays fixed during the vibration: each atom moves in inverse proportion to its own mass.
+        const xA = s.x + (-half - disp * mB / (mA + mB)) * scale * Math.min(grow, 1);
+        const xB = s.x + (half + disp * mA / (mA + mB)) * scale * Math.min(grow, 1);
+        const rA = dispRadius(info.a) * scale * grow * shrink, rB = dispRadius(info.b) * scale * grow * shrink;
+        const flash = clamp(1 - age / 0.55, 0, 1) * 0.9;
+
+        // bonds
+        if (grow > 0.15 && shrink > 0.05) {
+            const sw = Math.max(3, 15 * scale) * shrink;
+            const gap = 21 * scale * shrink;
+            const offs = info.order === 1 ? [0] : info.order === 2 ? [-gap / 2, gap / 2] : [-gap, 0, gap];
+            const sw2 = info.order === 1 ? sw : sw * (info.order === 2 ? 0.72 : 0.6);
+            const midX = xA + rA + ((xB - rB) - (xA + rA)) / 2;
+            ctx.save(); ctx.globalAlpha *= clamp(grow, 0, 1);
+            offs.forEach(o => {
+                drawStick(xA, y + o, midX, y + o, sw2, EL[info.a].color);
+                drawStick(midX, y + o, xB, y + o, sw2, EL[info.b].color);
+            });
+            ctx.restore();
+        }
+        // glow while vibrationally excited
+        if (s.E > M.G[0] + 0.3 * (M.G[1] - M.G[0])) {
+            const gl = clamp((s.E - M.G[0]) / (M.G[2] - M.G[0]), 0, 1);
+            ctx.save(); ctx.globalCompositeOperation = 'lighter';
+            [[xA, rA], [xB, rB]].forEach(([xx, rr]) => {
+                const g = ctx.createRadialGradient(xx, y, rr * 0.6, xx, y, rr * 1.9);
+                g.addColorStop(0, rgba(IR_COLOR, 0.35 * gl)); g.addColorStop(1, rgba(IR_COLOR, 0));
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(xx, y, rr * 1.9, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.restore();
+        }
+        // heat flowing out to the surroundings during non-radiative decay
+        if (s.relax) {
+            const showLbl = W >= 900;
+            const R0 = (info.r / 2 + Math.max(dispRadius(info.a), dispRadius(info.b))) * scale;
+            ctx.save(); ctx.globalCompositeOperation = 'lighter';
+            for (let k = 0; k < 3; k++) {
+                const ph = ((now - s.relax.t0) * 0.7 + k / 3) % 1;
+                const rr = R0 * (1 + ph * 1.6);
+                ctx.strokeStyle = `rgba(251,146,60,${0.35 * (1 - ph)})`; ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let a = 0; a <= Math.PI * 2 + 0.01; a += 0.05) {
+                    const wob = 1 + 0.05 * Math.sin(a * 9 + now * 6 + k);
+                    const xx = s.x + Math.cos(a) * rr * wob * 1.25, yy = y + Math.sin(a) * rr * wob * 0.75;
+                    a === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+            if (showLbl) { ctx.save(); ctx.fillStyle = 'rgba(253,186,116,0.9)'; ctx.font = `italic 600 ${Math.round(12 * cardScale + 1)}px ui-sans-serif, system-ui, Arial, sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('non-radiative decay: energy lost as heat', s.x, y + 50 * scale + 12);
+            ctx.restore(); }
+        }
+        const absorbFlash = s.absorbAt >= 0 ? clamp(1 - (now - s.absorbAt) / 0.5, 0, 1) * 0.6 : 0;
+        drawSphere(xA, y, rA, EL[info.a].color, Math.max(flash, absorbFlash));
+        drawSphere(xB, y, rB, EL[info.b].color, Math.max(flash, absorbFlash));
+        ctx.save(); ctx.globalAlpha *= clamp((age - 0.1) / 0.3, 0, 1) * shrink;
+        drawSymbol(xA, y, rA, info.a); drawSymbol(xB, y, rB, info.b);
+        ctx.restore();
+
+        const maxR = Math.max(dispRadius(info.a), dispRadius(info.b)) * scale;
+        drawFlash(s.x, y, Math.max(70, (info.r + 2 * maxR / scale) * scale * 0.9), age, s.color);
+        if (s.absorbAt >= 0) drawFlash(s.x, y, Math.max(60, (info.r + 2 * maxR / scale) * scale * 0.7), now - s.absorbAt, IR_COLOR);
+        if (morseT > 0.01 && MR) drawMorse(s, s.gx, s.gy + (1 - morseT) * 24, PW, PH, MR, morseT * s.alpha);
+        ctx.save(); ctx.translate(s.x, y - maxR - 30 * cardScale); ctx.scale(cardScale, cardScale);
+        drawCard(0, 0, s, s.alpha, (1 - clamp((age - 0.15) / 0.5, 0, 1)) * -12);
+        ctx.restore();
+        ctx.restore();
+    });
+
+    // photons: absorbed on arrival (excites the bond), emitted ones just fly off
+    for (let i = photons.length - 1; i >= 0; i--) {
+        const p = photons[i];
+        if (!p.slot.info) { photons.splice(i, 1); continue; }
+        if (now - p.t0 >= p.dur) {
+            p.slot.n = p.to; p.slot.absorbAt = now;
+            photons.splice(i, 1); continue;
+        }
+        drawPhoton(p);
+    }
+
+    if (live.length === 0) {
+        ctx.fillStyle = '#6b7280'; ctx.font = '600 15px ui-sans-serif, system-ui, Arial, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('No bonds selected. Open CONTROLS to choose atoms.', W / 2, H / 2);
+    }
+    drawRuler(shown);
+    updateFocusBar(tgt);
+    requestAnimationFrame(frame);
+}
+
+// ---------------- Focus mode controls ----------------
+const focusBar = document.getElementById('focus-bar');
+const ex1 = document.getElementById('btn-ex1'), ex2 = document.getElementById('btn-ex2'), relaxBtn = document.getElementById('btn-relax');
+ex1.addEventListener('click', () => focus && excite(focus, 1));
+ex2.addEventListener('click', () => focus && excite(focus, 2));
+relaxBtn.addEventListener('click', () => focus && relax(focus));
+window.addEventListener('keydown', e => { if (e.key === 'Escape') exitFocus(); });
+function updateFocusBar(tgt) {
+    const on = !!focus && focusT > 0.6;
+    focusBar.classList.toggle('show', on);
+    if (!focus) return;
+    const busy = photons.some(p => p.slot === focus) || !!focus.relax;
+    ex1.disabled = busy || focus.n >= 1; ex2.disabled = busy || focus.n >= 2; relaxBtn.disabled = busy || focus.n === 0;
+    const top = Math.round(focus.y + tgt.barOff) + 'px', left = Math.round(focus.x) + 'px';
+    if (focusBar.style.top !== top) focusBar.style.top = top;
+    if (focusBar.style.left !== left) focusBar.style.left = left;
+}
+cv.addEventListener('click', e => {
+    if (!showMorse) return;
+    const hit = graphRects.find(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
+    if (!hit) return;
+    if (focus === hit.slot) exitFocus(); else if (!focus) enterFocus(hit.slot);
+});
+cv.addEventListener('mousemove', e => {
+    const hit = showMorse && graphRects.some(r => e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h);
+    cv.style.cursor = hit ? 'zoom-in' : 'default';
+    if (hit && focus) cv.style.cursor = 'zoom-out';
+});
+
+// Start with C≡O, C=O and C–O, each appearing with its own flash.
+requestAnimationFrame(tms => {
+    const t0 = tms / 1000; last = t0; now = t0;
+    slots.forEach((s, i) => { s.info = bondInfo(s.a, s.b, s.order, s.hyb); s.spawn = t0 + 0.25 + i * 0.35; });
+    requestAnimationFrame(frame);
+});
+
+window.__bondSim = { slots, bondInfo, maxOrder, photons, get morseT() { return morseT; }, get focus() { return focus; } };
+})();
+</script>
+</body>
+</html>
