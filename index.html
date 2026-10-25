@@ -89,7 +89,7 @@
                 <span id="speed-val">1.0×</span>
                 <button id="btn-pause" class="cp-btn btn-blue">PAUSE</button>
                 <button id="btn-details" class="cp-btn btn-gray">μ &amp; k: OFF</button>
-                <button id="btn-morse" class="cp-btn btn-morse">SHOW MORSE POTENTIAL</button>
+                <button id="btn-morse" class="cp-btn btn-morse on">HIDE MORSE POTENTIAL</button>
             </div>
         </div>
     </div>
@@ -103,14 +103,14 @@
 // ---------------- Data ----------------
 // Average atomic masses (u), covalent radii (pm) and CPK-style colours.
 const EL = {
-    H:  { m: 1.008,   cov: 31,  color: '#eef2f7', ink: '#111827' },
-    C:  { m: 12.011,  cov: 76,  color: '#59616e', ink: '#ffffff' },
-    N:  { m: 14.007,  cov: 71,  color: '#2f6bf0', ink: '#ffffff' },
-    O:  { m: 15.999,  cov: 66,  color: '#e0322f', ink: '#ffffff' },
-    F:  { m: 18.998,  cov: 57,  color: '#9ad63a', ink: '#0f1a05' },
-    Cl: { m: 35.45,   cov: 102, color: '#2cc84f', ink: '#04210c' },
-    Br: { m: 79.904,  cov: 120, color: '#a3302b', ink: '#ffffff' },
-    I:  { m: 126.904, cov: 139, color: '#8b2fc9', ink: '#ffffff' }
+    H:  { m: 1.008,   cov: 31,  color: '#d9dde3', ink: '#1f2937' },
+    C:  { m: 12.011,  cov: 76,  color: '#4a4f57', ink: '#f3f4f6' },
+    N:  { m: 14.007,  cov: 71,  color: '#2f5fc4', ink: '#f3f4f6' },
+    O:  { m: 15.999,  cov: 66,  color: '#c62f2b', ink: '#f9fafb' },
+    F:  { m: 18.998,  cov: 57,  color: '#8fbf45', ink: '#1a2a08' },
+    Cl: { m: 35.45,   cov: 102, color: '#35a650', ink: '#06210d' },
+    Br: { m: 79.904,  cov: 120, color: '#8c2a24', ink: '#f9fafb' },
+    I:  { m: 126.904, cov: 139, color: '#6f2aa3', ink: '#f9fafb' }
 };
 const ATOMS = ['H', 'C', 'N', 'O', 'F', 'Cl', 'Br', 'I'];
 const HALOGENS = ['F', 'Cl', 'Br', 'I'];
@@ -178,7 +178,7 @@ function morseParams(info) {
 // Zero-point-style relative amplitude ∝ (μk)^-1/4, normalised to C–O and exaggerated for visibility.
 const REF_MUK = (12.011 * 15.999 / 28.01) * 510;
 function amplitudePm(info) { return 26 * Math.pow(REF_MUK / (info.mu * info.k), 0.25); }
-function dispRadius(el) { return 12 + 0.26 * EL[el].cov; }           // pm, for drawing
+function dispRadius(el) { return 14 + 0.34 * EL[el].cov; }           // pm, for drawing
 
 // ---------------- Colour helpers ----------------
 function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -189,12 +189,12 @@ function rgba(h, a) { const c = hexRgb(h); return `rgba(${c[0]},${c[1]},${c[2]},
 
 // ---------------- State ----------------
 const slots = [
-    { a: 'C', b: 'O', order: 3 },
-    { a: 'C', b: 'O', order: 2 },
+    { a: 'NONE', b: 'NONE', order: 1 },
+    { a: 'NONE', b: 'NONE', order: 1 },
     { a: 'C', b: 'O', order: 1 }
 ].map((s, i) => ({ ...s, hyb: 'sp3', n: 0, E: null, trans: null, absorbAt: -1, vis: 1, idx: i, color: SLOT_COLORS[i], info: null, spawn: -1, dying: -1, x: null, phase: 0, markerX: null }));
 
-let paused = false, speed = 1, showDetails = false, showMorse = false, morseT = 0;
+let paused = false, speed = 1, showDetails = false, showMorse = true, morseT = 1;
 let MR = null;   // shared Morse axis ranges (animated)
 let focus = null, focusT = 0;   // slot shown on its own after clicking its Morse graph
 const photons = [];
@@ -221,15 +221,34 @@ slots.forEach(slot => {
     g.append(tag, sa, so, sb);
     groupsEl.appendChild(g);
     slot.ui = { sa, sb, so };
-    const onChange = () => {
+    const onChange = e => {
         slot.a = sa.value; slot.b = sb.value;
         refreshOrderOptions(slot);
+        if (e && e.target !== so) pickUnusedOrder(slot);   // changing atoms: avoid duplicating a bond already shown
         if (so.dataset.mode === 'hyb') { slot.hyb = so.value; slot.order = 1; } else slot.order = +so.value;
         applySlot(slot);
     };
     sa.addEventListener('change', onChange); sb.addEventListener('change', onChange); so.addEventListener('change', onChange);
     refreshOrderOptions(slot);
 });
+// If another slot already shows this atom pair with the same bond order (or, for C–H, the same carbon
+// hybridization), switch this slot to the next higher option that isn't shown yet, otherwise the next lower one.
+const samePair = (s, a, b) => (s.a === a && s.b === b) || (s.a === b && s.b === a);
+function pickUnusedOrder(slot) {
+    const { so } = slot.ui;
+    if (maxOrder(slot.a, slot.b) === 0) return;
+    const others = slots.filter(o => o !== slot && maxOrder(o.a, o.b) > 0 && samePair(o, slot.a, slot.b));
+    if (!others.length) return;
+    const hyb = so.dataset.mode === 'hyb';
+    const used = new Set(others.map(o => hyb ? o.hyb : String(o.order)));
+    const opts = [...so.options].filter(o => !o.disabled).map(o => o.value);
+    const cur = opts.indexOf(so.value);
+    if (!used.has(so.value)) return;
+    const up = opts.slice(cur + 1).find(v => !used.has(v));
+    const down = opts.slice(0, cur).reverse().find(v => !used.has(v));
+    const pick = up ?? down;
+    if (pick != null) so.value = pick;
+}
 function refreshOrderOptions(slot) {
     const { so } = slot.ui;
     const mode = isCH(slot.a, slot.b) ? 'hyb' : 'order';
@@ -296,6 +315,7 @@ const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 
 const RULER_H = 136;
+const ATOM_PAD = 62;   // largest drawn atom radius (pm), for spacing
 // Side by side on wide screens; stacked in rows on narrow (phone) screens. mT (0..1) makes room for the Morse graphs.
 function layout(n, mT) {
     const stageTop = 34, stageBot = H - RULER_H;
@@ -304,20 +324,20 @@ function layout(n, mT) {
     // One common scale (px per pm) so bond lengths and atom sizes can be compared across bonds.
     let scale, cardScale, pos, PW, PH, gOff;
     if (!stacked) {
-        scale = clamp(Math.min((W / 3) * 0.86 / 420, stageH * 0.42 / 110), 0.25, 1.6);
+        scale = clamp(Math.min((W / 3) * 0.86 / 360, stageH * 0.42 / 130), 0.25, 1.9);
         cardScale = clamp(W / Math.max(n, 1) / 260, 0.55, 1);
         PW = Math.min(W / n * 0.92, 500);
         PH = clamp(stageH - 175 * cardScale - 90, 120, 260);
-        gOff = 50 * scale + 22;
-        const cardSpace = 50 * scale + 135 * cardScale;
+        gOff = ATOM_PAD * scale + 22;
+        const cardSpace = ATOM_PAD * scale + 135 * cardScale;
         const yOff = stageTop + stageH * 0.64;
         const yOn = stageTop + Math.max(4, (stageH - (cardSpace + gOff + PH)) / 2) + cardSpace;
         pos = i => ({ x: W * (i + 0.5) / n, y: yOff + (yOn - yOff) * mT });
     } else {
         const rowH = stageH / n;
-        scale = clamp(Math.min(W * 0.8 / 420, rowH * (0.3 - 0.12 * mT) / 110), 0.2, 1.6);
+        scale = clamp(Math.min(W * 0.8 / 360, rowH * (0.3 - 0.12 * mT) / 125), 0.2, 1.9);
         cardScale = clamp(Math.min(W / 300, rowH * (1 - 0.55 * mT) / 190), 0.4, 1);
-        PW = W * 0.94; PH = Math.max(70, rowH * 0.5 - 12); gOff = 50 * scale + 10;
+        PW = W * 0.94; PH = Math.max(70, rowH * 0.5 - 12); gOff = ATOM_PAD * scale + 10;
         pos = i => ({ x: W / 2, y: stageTop + rowH * i + rowH * (0.74 - 0.32 * mT) });
     }
     const gpos = i => { const p = pos(i); return { x: p.x, y: p.y + gOff }; };
@@ -329,21 +349,21 @@ function layoutFocus() {
     if (W >= 900) {
         // bond (with its card and buttons) on the left, graph on the right
         const leftW = W * 0.42;
-        const scale = clamp(Math.min(leftW * 1.0 / 420, stageH * 0.3 / 110), 0.3, 2.4);
+        const scale = clamp(Math.min(leftW * 0.95 / 340, stageH * 0.34 / 125), 0.3, 2.8);
         const cardScale = clamp(leftW / 320, 0.6, 1.15);
-        const cardSpace = 50 * scale + 157 * cardScale, below = 50 * scale + 26 + 50;
+        const cardSpace = ATOM_PAD * scale + 157 * cardScale, below = ATOM_PAD * scale + 26 + 50;
         const y = stageTop + Math.max(4, (stageH - (cardSpace + below)) / 2) + cardSpace;
         const x = leftW / 2 + 16;
         const PW = Math.min(W - leftW - 40, 780), PH = clamp(stageH - 24, 300, 660);
         const gx = leftW + (W - leftW) / 2 - 8, gy = stageTop + (stageH - PH) / 2;
-        return { scale, cardScale, pos: () => ({ x, y }), gpos: () => ({ x: gx, y: gy }), PW, PH, gOff: 0, barOff: 50 * scale + 46 };
+        return { scale, cardScale, pos: () => ({ x, y }), gpos: () => ({ x: gx, y: gy }), PW, PH, gOff: 0, barOff: ATOM_PAD * scale + 46 };
     }
     // narrow screens: bond on top, graph underneath, buttons at the bottom
     const barH = 84;
-    const scale = clamp(Math.min(W * 0.6 / 420, stageH * 0.18 / 110), 0.3, 2.2);
+    const scale = clamp(Math.min(W * 0.75 / 360, stageH * 0.19 / 125), 0.3, 2.4);
     const cardScale = clamp(W / 380, 0.6, 1.1);
-    const cardSpace = 50 * scale + 157 * cardScale;
-    const gOff = 50 * scale + 24;
+    const cardSpace = ATOM_PAD * scale + 157 * cardScale;
+    const gOff = ATOM_PAD * scale + 24;
     const PW = W * 0.94;
     const PH = clamp(stageH - cardSpace - gOff - barH, 200, 520);
     const y = stageTop + Math.max(4, (stageH - (cardSpace + gOff + PH + barH)) / 2) + cardSpace;
@@ -363,14 +383,68 @@ function drawBackground() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 }
 
-function drawSphere(x, y, r, color, flash) {
+// Atoms and bonds are shaded per pixel (diffuse + soft sky ambient + Blinn-Phong specular + Fresnel rim,
+// computed in linear light), pre-rendered once per element, then scaled with drawImage.
+const toLin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const toSRGB = v => { v = Math.max(0, Math.min(1, v)); return Math.round(255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)); };
+const LIGHT = (() => { const v = [-0.48, -0.58, 0.66], l = Math.hypot(...v); return v.map(c => c / l); })();
+const HALF = (() => { const v = [LIGHT[0], LIGHT[1], LIGHT[2] + 1], l = Math.hypot(...v); return v.map(c => c / l); })();
+const ENV = [0.10, 0.14, 0.24];                       // bluish surroundings (linear), matches the backdrop
+function shadeNormal(alb, nx, ny, nz) {
+    const ndl = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2];
+    const diff = Math.max(0, ndl);
+    const wrap = Math.max(0, (ndl + 0.3) / 1.3) * 0.12;               // light scattered just past the terminator
+    const sky = 0.05 + 0.07 * (0.5 - 0.5 * ny);                      // brighter from above
+    const ndh = Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]);
+    const spec = 0.55 * Math.pow(ndh, 90) + 0.06 * Math.pow(ndh, 12);
+    const fres = 0.04 + 0.96 * Math.pow(1 - Math.max(0, nz), 5);
+    return alb.map((a, k) => a * (0.92 * diff + wrap + sky) + spec + fres * ENV[k] * 0.9);
+}
+const SPHERE_RES = 160, sphereCache = {}, bondCache = {};
+function sphereSprite(el) {
+    if (sphereCache[el]) return sphereCache[el];
+    const N = SPHERE_RES, c = document.createElement('canvas'); c.width = c.height = N;
+    const g = c.getContext('2d'), img = g.createImageData(N, N);
+    const alb = hexRgb(EL[el].color).map(toLin);
+    for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+        const x = (px + 0.5) / N * 2 - 1, y = (py + 0.5) / N * 2 - 1, rr = x * x + y * y;
+        const edge = (1 - Math.sqrt(rr)) * N / 2;                     // distance to rim in pixels, for antialiasing
+        if (edge <= -1) continue;
+        const z = Math.sqrt(Math.max(0, 1 - rr));
+        const col = shadeNormal(alb, x, y, z), o = (py * N + px) * 4;
+        img.data[o] = toSRGB(col[0]); img.data[o + 1] = toSRGB(col[1]); img.data[o + 2] = toSRGB(col[2]);
+        img.data[o + 3] = Math.round(255 * clamp(edge + 0.5, 0, 1));
+    }
+    g.putImageData(img, 0, 0);
+    return (sphereCache[el] = c);
+}
+function bondSprite(color) {
+    if (bondCache[color]) return bondCache[color];
+    const N = 64, c = document.createElement('canvas'); c.width = 4; c.height = N;
+    const g = c.getContext('2d'), img = g.createImageData(4, N);
+    const alb = hexRgb(color).map(toLin);
+    for (let py = 0; py < N; py++) {
+        const y = (py + 0.5) / N * 2 - 1, z = Math.sqrt(Math.max(0, 1 - y * y));
+        const col = shadeNormal(alb, 0, y, z);
+        for (let px = 0; px < 4; px++) {
+            const o = (py * 4 + px) * 4;
+            img.data[o] = toSRGB(col[0]); img.data[o + 1] = toSRGB(col[1]); img.data[o + 2] = toSRGB(col[2]); img.data[o + 3] = 255;
+        }
+    }
+    g.putImageData(img, 0, 0);
+    return (bondCache[color] = c);
+}
+
+function drawSphere(x, y, r, color, flash, el) {
     if (r <= 0.5) return;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = r * 0.5; ctx.shadowOffsetY = r * 0.18;
-    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.05, x, y, r);
-    g.addColorStop(0, lighten(color, 0.8)); g.addColorStop(0.3, lighten(color, 0.18));
-    g.addColorStop(0.75, color); g.addColorStop(1, darken(color, 0.6));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    // soft cast shadow on the backdrop
+    const sx = x + r * 0.14, sy = y + r * 0.2;
+    const sh = ctx.createRadialGradient(sx, sy, r * 0.55, sx, sy, r * 1.4);
+    sh.addColorStop(0, 'rgba(0,0,0,0.4)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(sx, sy, r * 1.4, 0, Math.PI * 2); ctx.fill();
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(sphereSprite(el), x - r, y - r, 2 * r, 2 * r);
     ctx.restore();
     if (flash > 0) {
         ctx.save(); ctx.globalAlpha *= flash; ctx.fillStyle = '#ffffff';
@@ -378,20 +452,38 @@ function drawSphere(x, y, r, color, flash) {
     }
 }
 
+// Shaded cylinder: same lighting model as the atoms, applied across the bond's width.
 function drawStick(x1, y1, x2, y2, w, color) {
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = darken(color, 0.35); ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    ctx.strokeStyle = lighten(color, 0.2); ctx.lineWidth = w * 0.62; ctx.beginPath(); ctx.moveTo(x1, y1 - w * 0.12); ctx.lineTo(x2, y2 - w * 0.12); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = Math.max(1, w * 0.18); ctx.beginPath(); ctx.moveTo(x1, y1 - w * 0.25); ctx.lineTo(x2, y2 - w * 0.25); ctx.stroke();
+    const len = Math.hypot(x2 - x1, y2 - y1); if (len < 0.5) return;
+    ctx.save(); ctx.translate(x1, y1); ctx.rotate(Math.atan2(y2 - y1, x2 - x1));
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bondSprite(color), 0, -w / 2, len, w);
+    ctx.restore();
+}
+
+// Ambient occlusion: darkens the bond where it disappears into an atom.
+function drawContactShadow(x, y, r, bondW, bandH, dir) {
+    if (r <= 1) return;
+    ctx.save();
+    // only on the bond itself, on the side facing the other atom
+    ctx.beginPath(); ctx.rect(dir > 0 ? x : x - r - bondW * 2, y - bandH / 2, r + bondW * 2, bandH); ctx.clip();
+    const g = ctx.createRadialGradient(x, y, r * 0.95, x, y, r + bondW * 0.9);
+    g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r + bondW * 0.9, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
 }
 
 function drawSymbol(x, y, r, el) {
-    if (r < 6) return;
+    if (r < 7) return;
     ctx.save();
-    ctx.font = `800 ${Math.round(r * (el.length > 1 ? 0.78 : 0.92))}px ui-sans-serif, system-ui, Arial, sans-serif`;
+    ctx.font = `500 ${Math.round(r * (el.length > 1 ? 0.56 : 0.64))}px ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.shadowColor = EL[el].ink === '#ffffff' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.5)'; ctx.shadowBlur = 3;
-    ctx.fillStyle = EL[el].ink; ctx.fillText(el, x, y + r * 0.04);
+    const light = EL[el].ink !== '#1f2937' && !['F', 'Cl'].includes(el);
+    ctx.globalAlpha *= 0.85;
+    ctx.fillStyle = light ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.35)';
+    ctx.fillText(el, x + 0.8, y + r * 0.03 + 1);                     // subtle engraved edge
+    ctx.fillStyle = light ? 'rgba(245,246,248,0.92)' : 'rgba(17,24,39,0.85)';
+    ctx.fillText(el, x, y + r * 0.03);
     ctx.restore();
 }
 
@@ -856,8 +948,8 @@ function frame(tms) {
 
         // bonds
         if (grow > 0.15 && shrink > 0.05) {
-            const sw = Math.max(3, 15 * scale) * shrink;
-            const gap = 21 * scale * shrink;
+            const sw = Math.max(3, 13 * scale) * shrink;
+            const gap = 20 * scale * shrink;
             const offs = info.order === 1 ? [0] : info.order === 2 ? [-gap / 2, gap / 2] : [-gap, 0, gap];
             const sw2 = info.order === 1 ? sw : sw * (info.order === 2 ? 0.72 : 0.6);
             const midX = xA + rA + ((xB - rB) - (xA + rA)) / 2;
@@ -898,12 +990,17 @@ function frame(tms) {
             }
             ctx.restore();
             if (showLbl) { ctx.save(); ctx.fillStyle = 'rgba(253,186,116,0.9)'; ctx.font = `italic 600 ${Math.round(12 * cardScale + 1)}px ui-sans-serif, system-ui, Arial, sans-serif`;
-            ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('non-radiative decay: energy lost as heat', s.x, y + 50 * scale + 12);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('non-radiative decay: energy lost as heat', s.x, y + ATOM_PAD * scale + 12);
             ctx.restore(); }
         }
         const absorbFlash = s.absorbAt >= 0 ? clamp(1 - (now - s.absorbAt) / 0.5, 0, 1) * 0.6 : 0;
-        drawSphere(xA, y, rA, EL[info.a].color, Math.max(flash, absorbFlash));
-        drawSphere(xB, y, rB, EL[info.b].color, Math.max(flash, absorbFlash));
+        if (grow > 0.15) {
+            const bw = Math.max(3, 13 * scale) * shrink, gap = 20 * scale * shrink;
+            const bandH = info.order === 1 ? bw : info.order === 2 ? gap + bw * 0.72 : 2 * gap + bw * 0.6;
+            drawContactShadow(xA, y, rA, bw, bandH + 2, 1); drawContactShadow(xB, y, rB, bw, bandH + 2, -1);
+        }
+        drawSphere(xA, y, rA, EL[info.a].color, Math.max(flash, absorbFlash), info.a);
+        drawSphere(xB, y, rB, EL[info.b].color, Math.max(flash, absorbFlash), info.b);
         ctx.save(); ctx.globalAlpha *= clamp((age - 0.1) / 0.3, 0, 1) * shrink;
         drawSymbol(xA, y, rA, info.a); drawSymbol(xB, y, rB, info.b);
         ctx.restore();
@@ -967,10 +1064,11 @@ cv.addEventListener('mousemove', e => {
     if (hit && focus) cv.style.cursor = 'zoom-out';
 });
 
-// Start with C≡O, C=O and C–O, each appearing with its own flash.
+// Start with the C–O single bond (bond 3) alone, its Morse potential already zoomed in.
 requestAnimationFrame(tms => {
     const t0 = tms / 1000; last = t0; now = t0;
-    slots.forEach((s, i) => { s.info = bondInfo(s.a, s.b, s.order, s.hyb); s.spawn = t0 + 0.25 + i * 0.35; });
+    slots.forEach(s => { if (maxOrder(s.a, s.b) > 0) { s.info = bondInfo(s.a, s.b, s.order, s.hyb); s.spawn = t0 + 0.25; } });
+    focus = slots[2]; focusT = 1;
     requestAnimationFrame(frame);
 });
 
